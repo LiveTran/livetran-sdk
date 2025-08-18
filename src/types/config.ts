@@ -7,6 +7,7 @@ export interface SDKConfig {
 export interface StartArgs {
     stream_id:    string;
     webhook_urls: string[];
+    abr:          boolean;
 }
 
 export interface StopArgs {
