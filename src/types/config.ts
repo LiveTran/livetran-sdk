@@ -1,21 +1,22 @@
-export interface SDKConfig {
+export interface SelfHostedLiveTranConfig {
     sharedSecret: string;
     baseURL:   string;
 }
 
 
-export interface StartArgs {
+export interface SelfHostedStartArgs {
     stream_id:    string;
     webhook_urls: string[];
     abr:          boolean;
 }
 
-export interface StopArgs {
+export interface SelfHostedStopArgs {
     stream_id:    string
 }
 
 
-export interface ServerResponse {
+
+export interface SelfHostedServerResponse {
     success: boolean;
     data?: string
     error?: {

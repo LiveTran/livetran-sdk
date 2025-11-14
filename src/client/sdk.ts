@@ -1,15 +1,15 @@
-import { SDKConfig, ServerResponse, StartArgs, StopArgs } from '../types/config'
+import { SelfHostedLiveTranConfig, SelfHostedServerResponse, SelfHostedStartArgs, SelfHostedStopArgs } from '../types/config'
 import crypto from 'crypto';
 import fetch from "node-fetch";
 import { SDKError } from './error';
 
 
-export class LiveTranSDK {
+export class SelfHostedLiveTran {
 
     private sharedSecret: string;
     private baseUrl: string;
 
-    constructor (config: SDKConfig) {
+    constructor (config: SelfHostedLiveTranConfig) {
         this.baseUrl = config.baseURL
         this.sharedSecret = config.sharedSecret
     }
@@ -23,7 +23,7 @@ export class LiveTranSDK {
         return sig;
     }
 
-    async startStream(streamBody: StartArgs): Promise<ServerResponse> {
+    async startStream(streamBody: SelfHostedStartArgs): Promise<SelfHostedServerResponse> {
 
         const requestBody = JSON.stringify(streamBody)
 
@@ -60,7 +60,7 @@ export class LiveTranSDK {
 
     }
 
-    async stopStream(streamBody: StopArgs): Promise<ServerResponse> {
+    async stopStream(streamBody: SelfHostedStartArgs): Promise<SelfHostedServerResponse> {
 
         const requestBody = JSON.stringify(streamBody)
 
@@ -97,7 +97,7 @@ export class LiveTranSDK {
 
     }
 
-    async status(streamBody: StopArgs): Promise<ServerResponse> {
+    async status(streamBody: SelfHostedStopArgs): Promise<SelfHostedServerResponse> {
         const requestBody = JSON.stringify(streamBody)
 
         const signature = this.generateHMAC(requestBody)

@@ -1,8 +1,8 @@
-import {SDKConfig, ServerResponse} from "./types/config"
-import { LiveTranSDK } from "./client/sdk"
+import {SelfHostedLiveTranConfig, SelfHostedServerResponse} from "./types/config"
+import { SelfHostedLiveTran } from "./client/sdk"
 import { SDKError } from "./client/error"
 
 
 
 
-export { SDKConfig, ServerResponse, SDKError, LiveTranSDK}
+export { SelfHostedLiveTranConfig, SelfHostedServerResponse, SDKError, SelfHostedLiveTran };
