@@ -9,11 +9,11 @@ It provides a simple API to interact with the **LiveTran Server**: start/stop st
 ## ✨ Features
 
 * 🔑 **Stream Management** – Start, stop, and monitor streams programmatically
-* 📡 **Low-Latency HLS (LL-HLS)** support
 * 🎚 **Adaptive Bitrate (ABR)** playback integration
-* 🔐 **JWT-secured APIs** with signed requests
+* 🔐 **HMAC-secured APIs** with signed requests
 * ⚡ **TypeScript-first** – Includes full typings and intellisense
-* 🛠 Works in **Node.js & Browser** environments
+* 🛠 Works in **Node.js & Browser** environments (Cloudflare Workers, Bun, Deno)
+* 🌐 **Universal Crypto** – Uses Web Crypto API with Node.js fallback
 
 ---
 
@@ -23,66 +23,220 @@ It provides a simple API to interact with the **LiveTran Server**: start/stop st
 npm i @vijayvenkatj/livetran-sdk
 ```
 
+---
+
 ## 📖 Usage
 
-### Initialize Client
+The SDK provides two client classes depending on your deployment:
+
+### Self-Hosted LiveTran Server
+
+For self-hosted LiveTran instances:
 
 ```ts
-import { LiveTran } from "livetran-sdk";
+import { SelfHostedLiveTran } from "@vijayvenkatj/livetran-sdk";
 
-const client = new LiveTran({
-  baseUrl: "http://localhost:8080", // your LiveTran server
-  apiKey: process.env.LIVETRAN_API_KEY, // optional, if secured
+const client = new SelfHostedLiveTran({
+  baseURL: "http://localhost:8080", // your self-hosted server URL
+  sharedSecret: process.env.LIVETRAN_SHARED_SECRET, // HMAC signing secret
 });
 ```
 
----
-
-### Start a Stream
+#### Start a Stream
 
 ```ts
-await client.stream.start({
+const response = await client.startStream({
   stream_id: "my-awesome-stream",
   webhook_urls: ["https://my-service.com/webhook"],
+  abr: true, // enable adaptive bitrate
 });
+
+console.log(response);
+// { success: true, data: "..." }
+```
+
+#### Stop a Stream
+
+```ts
+const response = await client.stopStream({
+  stream_id: "my-awesome-stream",
+});
+
+console.log(response);
+// { success: true, data: "..." }
+```
+
+#### Check Stream Status
+
+```ts
+const response = await client.status({
+  stream_id: "my-awesome-stream",
+});
+
+console.log(response);
+// { success: true, data: "..." }
 ```
 
 ---
 
-### Stop a Stream
+### Hosted LiveTran Service
+
+For the hosted LiveTran platform:
 
 ```ts
-await client.stream.stop({
-  stream_id: "my-awesome-stream",
+import { LiveTranSDK } from "@vijayvenkatj/livetran-sdk";
+
+const client = new LiveTranSDK({
+  baseURL: "https://api.livetran.com", // LiveTran API base URL
+  sharedSecret: process.env.LIVETRAN_SHARED_SECRET, // HMAC signing secret
+  projectID: process.env.LIVETRAN_PROJECT_ID, // your project ID
+  apiKey: process.env.LIVETRAN_API_KEY, // your API key
 });
+```
+
+#### Start a Stream
+
+```ts
+const response = await client.startStream({
+  title: "My Live Stream",
+  description: "Optional stream description",
+  stream_key: "your-stream-key",
+});
+
+console.log(response);
+// {
+//   data: {
+//     output_url: "https://...",
+//     srt_url: "srt://...",
+//   }
+// }
+```
+
+#### Stop a Stream
+
+```ts
+const response = await client.stopStream({
+  stream_key: "your-stream-key",
+});
+
+console.log(response);
+// {
+//   data: {
+//     message: "Stream stopped successfully",
+//   }
+// }
 ```
 
 ---
 
-### Check Stream Status
+## 🛠 Error Handling
+
+The SDK throws `SDKError` for API errors:
 
 ```ts
-const status = await client.stream.status({
-  stream_id: "my-awesome-stream",
-});
+import { SDKError } from "@vijayvenkatj/livetran-sdk";
 
-console.log(status);
-/*
-{
-  stream_id: "my-awesome-stream",
-  active: true,
-  renditions: ["1080p", "720p", "480p"],
-  started_at: "2025-08-18T12:00:00Z"
+try {
+  await client.startStream({ ... });
+} catch (error) {
+  if (error instanceof SDKError) {
+    console.error(`API Error (${error.statusCode}): ${error.message}`);
+  } else {
+    console.error("Unexpected error:", error);
+  }
 }
-*/
+```
+
+---
+
+## 📚 API Reference
+
+### `SelfHostedLiveTran`
+
+#### Constructor
+
+```ts
+new SelfHostedLiveTran(config: SelfHostedLiveTranConfig)
+```
+
+**Config:**
+- `baseURL: string` – Your self-hosted LiveTran server URL
+- `sharedSecret: string` – HMAC signing secret for request authentication
+
+#### Methods
+
+- **`startStream(args: SelfHostedStartArgs): Promise<SelfHostedServerResponse>`**
+  - `stream_id: string` – Unique identifier for the stream
+  - `webhook_urls: string[]` – Array of webhook URLs to notify
+  - `abr: boolean` – Enable adaptive bitrate streaming
+
+- **`stopStream(args: SelfHostedStopArgs): Promise<SelfHostedServerResponse>`**
+  - `stream_id: string` – Stream identifier to stop
+
+- **`status(args: SelfHostedStopArgs): Promise<SelfHostedServerResponse>`**
+  - `stream_id: string` – Stream identifier to check status
+
+---
+
+### `LiveTranSDK`
+
+#### Constructor
+
+```ts
+new LiveTranSDK(config: LiveTranConfig)
+```
+
+**Config:**
+- `baseURL: string` – LiveTran API base URL
+- `sharedSecret: string` – HMAC signing secret
+- `projectID: string` – Your LiveTran project ID
+- `apiKey: string` – Your LiveTran API key
+
+#### Methods
+
+- **`startStream(args: LiveTranStartArgs): Promise<StartResponse>`**
+  - `title: string` – Stream title
+  - `description?: string` – Optional stream description
+  - `stream_key: string` – Stream key for authentication
+
+- **`stopStream(args: LiveTranStopArgs): Promise<StopResponse>`**
+  - `stream_key: string` – Stream key to stop
+
+---
+
+## 🔐 Security
+
+All requests are signed using HMAC-SHA256 signatures. The SDK automatically:
+1. Generates signatures using your `sharedSecret`
+2. Includes the signature in the `LT-SIGNATURE` header
+3. Works across different JavaScript runtimes (Node.js, Cloudflare Workers, Bun, Deno)
+
+---
+
+## 📦 TypeScript Support
+
+Full TypeScript definitions are included. All types are exported:
+
+```ts
+import type {
+  SelfHostedLiveTranConfig,
+  SelfHostedStartArgs,
+  SelfHostedStopArgs,
+  SelfHostedServerResponse,
+  LiveTranConfig,
+  LiveTranStartArgs,
+  LiveTranStopArgs,
+  StartResponse,
+  StopResponse,
+} from "@vijayvenkatj/livetran-sdk";
 ```
 
 ---
 
 ## 🛠 Requirements
 
-* Node.js ≥ 18
-* A running [LiveTran server](https://github.com/your-username/LiveTran)
+* Node.js ≥ 18 (or compatible runtime)
+* A running [LiveTran server](https://github.com/Livetran/LiveTran) (for self-hosted) or LiveTran account (for hosted)
 
 ---
 
@@ -91,15 +245,18 @@ console.log(status);
 * Automating stream lifecycle in your backend
 * Embedding **secure low-latency playback** into web apps
 * Building dashboards or monitoring tools around LiveTran
+* Integrating streaming into serverless functions (Cloudflare Workers, Vercel, etc.)
 
 ---
 
-## 📜 API Coverage
+## 📜 Development
 
-* `stream.start()` → Start a live stream
-* `stream.stop()` → Stop an active stream
-* `stream.status()` → Get stream state
-* *(more endpoints coming soon...)*
+```bash
+# Build the project
+npm run build
+
+# The build output will be in the `dist/` directory
+```
 
 ---
 
@@ -110,3 +267,9 @@ Contributions are welcome to improve the SDK!
 1. Fork the repo
 2. Create a feature branch
 3. Submit a PR
+
+---
+
+## 📄 License
+
+MIT
