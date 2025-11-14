@@ -50,13 +50,19 @@ function normalizeResponse(json: any) {
 
 
 async function safeParse(response: Response, status: number) {
+  const text = await response.text();
+
   try {
-    return await response.json();
+    return JSON.parse(text);
   } catch {
-    const text = await response.text();
-    throw new SDKError(text || "Invalid response from server", status);
+    if (!response.ok) {
+      throw new SDKError(text || "Invalid response from server", status);
+    }
+
+    return text;
   }
 }
+
 
 
 export class SelfHostedLiveTran {
