@@ -1,6 +1,6 @@
 {
   "name": "@vijayvenkatj/livetran-sdk",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Official Node.js SDK for LiveTran streaming platform",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
