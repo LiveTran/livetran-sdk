@@ -18,13 +18,13 @@ import { SDKError } from "./error.js";
 async function generateHMAC(secret: string, requestBody: string): Promise<string> {
   const enc = new TextEncoder();
   const bodyBytes = enc.encode(requestBody);
-  const keyBytes = enc.encode(secret);
+  const secretBytes = enc.encode(secret);
 
   // Cloudflare / Browser / Bun / Deno
   if (globalThis.crypto?.subtle) {
     const key = await crypto.subtle.importKey(
       "raw",
-      keyBytes,
+      secretBytes,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
@@ -42,14 +42,22 @@ async function generateHMAC(secret: string, requestBody: string): Promise<string
   return nodeCrypto.createHmac("sha256", secret).update(requestBody).digest("hex");
 }
 
+
 function normalizeResponse(json: any) {
   if (json?.data) return json.data;
   return json;
 }
 
-/* ============================================================================
-   SELF-HOSTED SDK
-============================================================================ */
+
+async function safeParse(response: Response, status: number) {
+  try {
+    return await response.json();
+  } catch {
+    const text = await response.text();
+    throw new SDKError(text || "Invalid response from server", status);
+  }
+}
+
 
 export class SelfHostedLiveTran {
   private sharedSecret: string;
@@ -73,7 +81,8 @@ export class SelfHostedLiveTran {
       body: requestBody,
     });
 
-    const json = await response.json();
+    const json = await safeParse(response, response.status);
+
     if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
     }
@@ -97,9 +106,6 @@ export class SelfHostedLiveTran {
   }
 }
 
-/* ============================================================================
-   CLOUD / SaaS SDK
-============================================================================ */
 
 export class LiveTranSDK {
   private SharedSecret: string;
@@ -133,7 +139,7 @@ export class LiveTranSDK {
       body: requestBody,
     });
 
-    const json = await response.json();
+    const json = await safeParse(response, response.status);
 
     if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
@@ -155,6 +161,7 @@ export class LiveTranSDK {
 
   async stopStream(body: LiveTranStopArgs): Promise<StopResponse> {
     const data = await this.send("/api/v1/stream/stop", body);
+
     return {
       data: {
         message: data.message,
