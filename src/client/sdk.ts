@@ -159,7 +159,7 @@ export class LiveTranSDK {
     });
 
     const json = await response.json();
-    if (!response.ok || json.success !== true) {
+    if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
     }
 
@@ -190,7 +190,7 @@ export class LiveTranSDK {
     });
 
     const json = await response.json();
-    if (!response.ok || json.success !== true) {
+    if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
     }
 
