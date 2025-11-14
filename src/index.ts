@@ -1,7 +1,8 @@
-import {SelfHostedLiveTranConfig, SelfHostedServerResponse, LiveTranConfig, StartResponse, StopResponse} from "./types/config"
-import { SelfHostedLiveTran, LiveTranSDK } from "./client/sdk"
-import { SDKError } from "./client/error"
+import {SelfHostedLiveTranConfig, SelfHostedServerResponse, LiveTranConfig, StartResponse, StopResponse} from "./types/config.js"
+import { SelfHostedLiveTran, LiveTranSDK } from "./client/sdk.js"
+import { SDKError } from "./client/error.js"
 
 
 
-export { SelfHostedLiveTranConfig, SelfHostedServerResponse, SDKError, SelfHostedLiveTran, LiveTranConfig, LiveTranSDK, StartResponse, StopResponse };
+export type { SelfHostedLiveTranConfig, SelfHostedServerResponse, LiveTranConfig, StartResponse, StopResponse };
+export { SDKError, SelfHostedLiveTran, LiveTranSDK };

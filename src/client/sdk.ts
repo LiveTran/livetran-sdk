@@ -8,41 +8,43 @@ import {
   SelfHostedStopArgs,
   StartResponse,
   StopResponse,
-} from "../types/config";
+} from "../types/config.js";
 
-import { SDKError } from "./error";
+import { SDKError } from "./error.js";
 
 /**
- * UNIVERSAL HMAC (Web Crypto first → Node fallback)
+ * UNIVERSAL HMAC (Workers first → Node fallback)
  */
 async function generateHMAC(secret: string, requestBody: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const bodyBytes = encoder.encode(requestBody);
-  const secretBytes = encoder.encode(secret);
+  const enc = new TextEncoder();
+  const bodyBytes = enc.encode(requestBody);
+  const keyBytes = enc.encode(secret);
 
-  // Cloudflare Workers / Browser / Bun / Deno
-  if (typeof globalThis.crypto?.subtle !== "undefined") {
-    const key = await globalThis.crypto.subtle.importKey(
+  // Cloudflare / Browser / Bun / Deno
+  if (globalThis.crypto?.subtle) {
+    const key = await crypto.subtle.importKey(
       "raw",
-      secretBytes,
+      keyBytes,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
     );
 
-    const sig = await globalThis.crypto.subtle.sign("HMAC", key, bodyBytes);
+    const signature = await crypto.subtle.sign("HMAC", key, bodyBytes);
 
-    return [...new Uint8Array(sig)]
+    return [...new Uint8Array(signature)]
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
   }
 
   // Node.js fallback
   const nodeCrypto = await import("crypto");
-  return nodeCrypto
-    .createHmac("sha256", secret)
-    .update(requestBody)
-    .digest("hex");
+  return nodeCrypto.createHmac("sha256", secret).update(requestBody).digest("hex");
+}
+
+function normalizeResponse(json: any) {
+  if (json?.data) return json.data;
+  return json;
 }
 
 /* ============================================================================
@@ -58,11 +60,11 @@ export class SelfHostedLiveTran {
     this.sharedSecret = config.sharedSecret;
   }
 
-  async startStream(streamBody: SelfHostedStartArgs): Promise<SelfHostedServerResponse> {
-    const requestBody = JSON.stringify(streamBody);
+  private async send(path: string, body: any) {
+    const requestBody = JSON.stringify(body);
     const signature = await generateHMAC(this.sharedSecret, requestBody);
 
-    const response = await fetch(`${this.baseUrl}/api/start-stream`, {
+    const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,53 +74,26 @@ export class SelfHostedLiveTran {
     });
 
     const json = await response.json();
-    if (!response.ok || json.success !== true) {
+    if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
     }
 
-    return { success: true, data: json.data };
+    return normalizeResponse(json);
   }
 
-  async stopStream(streamBody: SelfHostedStopArgs): Promise<SelfHostedServerResponse> {
-    const requestBody = JSON.stringify(streamBody);
-    const signature = await generateHMAC(this.sharedSecret, requestBody);
-
-    const response = await fetch(`${this.baseUrl}/api/stop-stream`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "LT-SIGNATURE": signature,
-      },
-      body: requestBody,
-    });
-
-    const json = await response.json();
-    if (!response.ok || json.success !== true) {
-      throw new SDKError(json?.error || "Unknown error", response.status);
-    }
-
-    return { success: true, data: json.data };
+  async startStream(body: SelfHostedStartArgs): Promise<SelfHostedServerResponse> {
+    const data = await this.send("/api/start-stream", body);
+    return { success: true, data };
   }
 
-  async status(streamBody: SelfHostedStopArgs): Promise<SelfHostedServerResponse> {
-    const requestBody = JSON.stringify(streamBody);
-    const signature = await generateHMAC(this.sharedSecret, requestBody);
+  async stopStream(body: SelfHostedStopArgs): Promise<SelfHostedServerResponse> {
+    const data = await this.send("/api/stop-stream", body);
+    return { success: true, data };
+  }
 
-    const response = await fetch(`${this.baseUrl}/api/status`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "LT-SIGNATURE": signature,
-      },
-      body: requestBody,
-    });
-
-    const json = await response.json();
-    if (!response.ok || json.success !== true) {
-      throw new SDKError(json?.error || "Unknown error", response.status);
-    }
-
-    return { success: true, data: json.data };
+  async status(body: SelfHostedStopArgs): Promise<SelfHostedServerResponse> {
+    const data = await this.send("/api/status", body);
+    return { success: true, data };
   }
 }
 
@@ -139,17 +114,17 @@ export class LiveTranSDK {
     this.ApiKey = config.apiKey;
   }
 
-  async startStream(streamBody: LiveTranStartArgs): Promise<StartResponse> {
+  private async send(path: string, body: any) {
     const fullBody = {
       api_key: this.ApiKey,
       project_id: this.ProjectId,
-      ...streamBody,
+      ...body,
     };
 
     const requestBody = JSON.stringify(fullBody);
     const signature = await generateHMAC(this.SharedSecret, requestBody);
 
-    const response = await fetch(`${this.ApiBaseUrl}/api/v1/stream/start`, {
+    const response = await fetch(`${this.ApiBaseUrl}${path}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -159,44 +134,30 @@ export class LiveTranSDK {
     });
 
     const json = await response.json();
+
     if (!response.ok) {
       throw new SDKError(json?.error || "Unknown error", response.status);
     }
 
+    return normalizeResponse(json);
+  }
+
+  async startStream(body: LiveTranStartArgs): Promise<StartResponse> {
+    const data = await this.send("/api/v1/stream/start", body);
+
     return {
       data: {
-        output_url: json.data.output_url,
-        srt_url: json.data.srt_url,
+        output_url: data.output_url,
+        srt_url: data.srt_url,
       },
     };
   }
 
-  async stopStream(streamBody: LiveTranStopArgs): Promise<StopResponse> {
-    const fullBody = {
-      api_key: this.ApiKey,
-      ...streamBody,
-    };
-
-    const requestBody = JSON.stringify(fullBody);
-    const signature = await generateHMAC(this.SharedSecret, requestBody);
-
-    const response = await fetch(`${this.ApiBaseUrl}/api/v1/stream/stop`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "LT-SIGNATURE": signature,
-      },
-      body: requestBody,
-    });
-
-    const json = await response.json();
-    if (!response.ok) {
-      throw new SDKError(json?.error || "Unknown error", response.status);
-    }
-
+  async stopStream(body: LiveTranStopArgs): Promise<StopResponse> {
+    const data = await this.send("/api/v1/stream/stop", body);
     return {
       data: {
-        message: json.data.message,
+        message: data.message,
       },
     };
   }
