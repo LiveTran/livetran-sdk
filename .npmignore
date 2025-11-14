@@ -1,0 +1,9 @@
+src/
+test/
+*.log
+coverage/
+jest.config.js
+tsconfig.json
+.vscode/
+.idea/
+.DS_Store
